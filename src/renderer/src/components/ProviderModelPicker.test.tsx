@@ -352,3 +352,63 @@ it("keeps Cancel on a connecting provider while its download runs", async () => 
   await fireEvent.click(dialog.getByRole("button", { name: "Cancel" }));
   expect(onCancel).toHaveBeenCalledWith("opencode");
 });
+
+// A saved endpoint is served by OpenCode, so its model arrives in the same catalog as OpenCode's
+// own. The tab is what separates them, and a model whose id is prefixed by a saved endpoint id has
+// to land on the Custom tab under the id OpenCode composes for it.
+it("lists a saved endpoint's model on the Custom tab and selects its composed id", async () => {
+  const onChange = vi.fn();
+  const [model, setModel] = createSignal("opencode/muse-spark-1.3-contributor-free");
+  const status: AgentStatus = {
+    ...agentStatus,
+    providers: withOpenCodeProvider({ state: "available", version: "1.18.33" }),
+  };
+  const view = render(() => (
+    <ProviderModelPicker
+      provider="opencode"
+      value={model()}
+      modelOptions={[
+        ...openCodeModels,
+        {
+          provider: "opencode",
+          id: "opencode-go-direct/deepseek-v4.1-flash",
+          name: "OpenCode Go/deepseek-v4.1-flash",
+          description: "",
+          defaultReasoningEffort: "medium",
+          supportedReasoningEfforts: ["medium"],
+        },
+      ]}
+      agentStatus={status}
+      customProviders={[
+        {
+          id: "opencode-go-direct",
+          name: "OpenCode Go",
+          baseUrl: "https://opencode.ai/zen/go/v1",
+          hasApiKey: true,
+          models: [{ id: "deepseek-v4.1-flash", name: "deepseek-v4.1-flash" }],
+        },
+      ]}
+      onChange={(nextModel, provider) => {
+        setModel(nextModel);
+        onChange(nextModel, provider);
+      }}
+    />
+  ));
+  await fireEvent.click(view.getByRole("button", { name: /Agent model:/ }));
+  const dialog = within(view.getByRole("dialog", { name: "Choose agent model" }));
+
+  await fireEvent.click(dialog.getByRole("tab", { name: "Custom: 1 endpoint" }));
+  // Both panels stay in the document, so each rail is read through its own list. Only the selected
+  // one is visible, which is why the query reaches the hidden half too.
+  const customRail = () => within(dialog.getByRole("listbox", { name: "Custom models", hidden: true }));
+  const openCodeRail = () => within(dialog.getByRole("listbox", { name: "OpenCode models", hidden: true }));
+  await fireEvent.click(customRail().getByRole("option", { name: "deepseek-v4.1-flash" }));
+
+  expect(onChange).toHaveBeenLastCalledWith("opencode-go-direct/deepseek-v4.1-flash", "opencode");
+  // The endpoint's model is the Custom rail's, and OpenCode's own rail does not repeat it.
+  expect(
+    openCodeRail()
+      .getAllByRole("option", { hidden: true })
+      .map((option) => option.getAttribute("aria-label")),
+  ).toEqual(["Example Free", "Unknown price", "GPT"]);
+});
