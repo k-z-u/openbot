@@ -1,7 +1,7 @@
 appId: app.openbot.desktop
-productName: OpenBot
+productName: KZUBot
 protocols:
-  - name: OpenBot invitations
+  - name: KZUBot invitations
     schemes:
       - openbot
 asar: true

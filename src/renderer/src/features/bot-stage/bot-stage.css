@@ -15,6 +15,8 @@
   --kz-halo: clamp(180px, 24vh, 340px);
   --kz-period: 17s;
   --kz-amplitude: 0.05;
+  /* Overridden inline from the writing rate; this is the resting pace. */
+  --kz-pulse: 2.4s;
 
   position: relative;
   display: flex;
@@ -112,12 +114,36 @@
   animation: kz-wave-breathe calc(var(--kz-period) / 2) var(--openbot-ease-in-out) infinite;
 }
 
-.kz-wave-line[data-layer="1"] {
+/*
+ * The glow: the same outline, six times as wide and a fifth as bright. It is what makes a beat read
+ * as light coming off the ring rather than as a line moving, and it is two strokes instead of a
+ * blur because a filter would re-rasterise this halo on every frame.
+ */
+.kz-wave-glow {
+  fill: none;
+  stroke: var(--openbot-accent);
+  stroke-width: 6;
+  stroke-linecap: round;
+  opacity: 0.16;
+  transform-origin: center;
+  animation: kz-wave-breathe calc(var(--kz-period) / 2) var(--openbot-ease-in-out) infinite;
+}
+
+.kz-wave-line[data-layer="1"],
+.kz-wave-glow[data-layer="1"] {
   opacity: 0.34;
+}
+
+.kz-wave-glow[data-layer="1"] {
+  opacity: 0.11;
 }
 
 .kz-wave-line[data-layer="2"] {
   opacity: 0.22;
+}
+
+.kz-wave-glow[data-layer="2"] {
+  opacity: 0.07;
 }
 
 .kz-waves[data-motion="still"] .kz-wave-line {
@@ -130,6 +156,26 @@
 
 .kz-waves[data-motion="converge"] .kz-wave-line {
   animation-name: kz-wave-converge;
+}
+
+/*
+ * The heartbeat. `--kz-pulse` is the gap between beats, which `pulsePeriodMs` reads off the rate the
+ * answer is arriving at, so the ring beats with the model rather than on a clock of its own.
+ *
+ * Two strikes close together and then a rest: that is a heart, and the rest is most of the cycle,
+ * which is what separates it from a throb. The glow strikes with it, brighter and wider, and the
+ * status dot keeps the same beat.
+ */
+.kz-waves[data-motion="pulse"] .kz-wave-line {
+  animation-name: kz-heartbeat;
+  animation-duration: var(--kz-pulse);
+  animation-timing-function: var(--openbot-ease-out);
+}
+
+.kz-waves[data-motion="pulse"] .kz-wave-glow {
+  animation-name: kz-heartbeat-glow;
+  animation-duration: var(--kz-pulse);
+  animation-timing-function: var(--openbot-ease-out);
 }
 
 @keyframes kz-wave-drift {
@@ -195,6 +241,124 @@
   }
 }
 
+/* Lub, then dub, then the rest: a beat of the ring, brighter than the breathing states. */
+@keyframes kz-heartbeat {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+
+  6% {
+    transform: scale(calc(1 + var(--kz-amplitude) * 1.6));
+    opacity: 1;
+  }
+
+  14% {
+    transform: scale(0.998);
+    opacity: 0.48;
+  }
+
+  21% {
+    transform: scale(calc(1 + var(--kz-amplitude)));
+    opacity: 0.78;
+  }
+
+  32% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+}
+
+/* The glow takes the same two strikes, and it is the one that reads as light rather than line. */
+@keyframes kz-heartbeat-glow {
+  0% {
+    opacity: 0.16;
+  }
+
+  6% {
+    opacity: 0.55;
+  }
+
+  14% {
+    opacity: 0.15;
+  }
+
+  21% {
+    opacity: 0.38;
+  }
+
+  32% {
+    opacity: 0.16;
+  }
+
+  100% {
+    opacity: 0.16;
+  }
+}
+
+@keyframes kz-heartbeat-dot {
+  0% {
+    transform: scale(1);
+  }
+
+  6% {
+    transform: scale(1.8);
+  }
+
+  14% {
+    transform: scale(1);
+  }
+
+  21% {
+    transform: scale(1.4);
+  }
+
+  32% {
+    transform: scale(1);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes kz-heartbeat-aura {
+  0% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+
+  6% {
+    opacity: 1;
+    transform: scale(1.035);
+  }
+
+  14% {
+    opacity: 0.88;
+    transform: scale(1);
+  }
+
+  21% {
+    opacity: 0.96;
+    transform: scale(1.02);
+  }
+
+  32% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+}
+
 /* --- status --------------------------------------------------------------------------------- */
 
 .kz-status {
@@ -240,6 +404,19 @@
 
 .kz-status-line[data-state="completed"] .kz-status-dot {
   background: var(--openbot-success);
+}
+
+/*
+ * The beat, on the two things that are not the rings: the dot under the core and the light behind
+ * it. They are written after their own base rules rather than beside the keyframes, so a modifier
+ * never comes before the rule it modifies.
+ */
+.kz-stage[data-motion="pulse"] .kz-status-dot {
+  animation: kz-heartbeat-dot var(--kz-pulse) var(--openbot-ease-out) infinite;
+}
+
+.kz-stage[data-motion="pulse"] .kz-bot-core-aura {
+  animation: kz-heartbeat-aura var(--kz-pulse) var(--openbot-ease-out) infinite;
 }
 
 .kz-status-text {
@@ -363,7 +540,11 @@
    * rules above, which is what lets the freeze win on source order instead of on `!important`.
    */
   .kz-stage .kz-waves .kz-wave,
-  .kz-stage .kz-waves .kz-wave-line {
+  .kz-stage .kz-waves .kz-wave-line,
+  .kz-stage .kz-waves .kz-wave-glow,
+  /* The attribute keeps these as specific as the pulse rules they have to beat. */
+  .kz-stage[data-motion] .kz-status-dot,
+  .kz-stage[data-motion] .kz-bot-core-aura {
     animation: none;
   }
 

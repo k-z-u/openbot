@@ -123,7 +123,35 @@ export function avatarMoodFor(state: AgentVisualState) {
   }
 }
 
-export type WaveMotion = "still" | "breathe" | "bleed" | "converge";
+export type WaveMotion = "still" | "breathe" | "bleed" | "converge" | "pulse";
+
+/**
+ * Characters of answer text one heartbeat stands for.
+ *
+ * The beat is the model's writing pace made visible: at about 22 characters a second - a calm
+ * answer - the ring beats once a second, and it speeds up with the model rather than on a timer of
+ * its own. Roughly four characters make a token in English prose, so this is about five tokens per
+ * beat; it is written in characters because characters are what the renderer actually receives.
+ */
+const CHARACTERS_PER_PULSE = 22;
+
+/** The fastest and slowest the beat may go, whatever the writing rate is. */
+const MIN_PULSE_MS = 520;
+const MAX_PULSE_MS = 2_400;
+
+/**
+ * The gap between two heartbeats for an answer arriving at this rate.
+ *
+ * A stall falls back to the slow end rather than stopping: a turn that is thinking between two
+ * sentences still has a pulse, it is just a resting one. Zero - nothing streaming - gets the same
+ * slow end, which is what the ring shows before the first token lands.
+ */
+export function pulsePeriodMs(charactersPerSecond: number): number {
+  if (!(charactersPerSecond > 0)) return MAX_PULSE_MS;
+  const beatsPerSecond = charactersPerSecond / CHARACTERS_PER_PULSE;
+  const period = 1_000 / Math.max(beatsPerSecond, 1_000 / MAX_PULSE_MS);
+  return Math.round(Math.min(MAX_PULSE_MS, Math.max(MIN_PULSE_MS, period)));
+}
 
 export interface WaveLayer {
   /** Draw order and animation phase; the far layers sit behind the near ones. */
@@ -167,7 +195,9 @@ const WAVE_SHAPES: Readonly<Record<AgentVisualState, WaveShape>> = {
   thinking: { layers: 1, periodMs: 17_000, amplitude: 0.05, motion: "breathe" },
   "deep-thinking": { layers: 3, periodMs: 11_000, amplitude: 0.08, motion: "breathe" },
   "tool-use": { layers: 2, periodMs: 9_000, amplitude: 0.09, motion: "bleed" },
-  answering: { layers: 2, periodMs: 7_000, amplitude: 0.05, motion: "converge" },
+  // The answer is where tokens are actually arriving, so it is the one state whose pace has a
+  // source to follow: `pulsePeriodMs` reads the writing rate and the ring beats with it.
+  answering: { layers: 2, periodMs: 7_000, amplitude: 0.045, motion: "pulse" },
   waiting: { layers: 1, periodMs: 48_000, amplitude: 0.02, motion: "still" },
   completed: { layers: 2, periodMs: 6_000, amplitude: 0.04, motion: "converge" },
   error: { layers: 1, periodMs: 30_000, amplitude: 0.03, motion: "still" },

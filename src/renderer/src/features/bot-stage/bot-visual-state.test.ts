@@ -6,6 +6,7 @@ import {
   avatarMoodFor,
   DEEP_THINKING_AFTER_MS,
   effortWaveLayers,
+  pulsePeriodMs,
   wavePlan,
 } from "./bot-visual-state";
 
@@ -164,7 +165,31 @@ describe("wavePlan", () => {
   it("moves in the direction the state means", () => {
     expect(wavePlan("idle", null).motion).toBe("still");
     expect(wavePlan("tool-use", null).motion).toBe("bleed");
-    expect(wavePlan("answering", null).motion).toBe("converge");
+    expect(wavePlan("answering", null).motion).toBe("pulse");
+    expect(wavePlan("completed", null).motion).toBe("converge");
     expect(wavePlan("thinking", null).motion).toBe("breathe");
+  });
+});
+
+describe("pulsePeriodMs", () => {
+  it("beats with the writing, not on a clock of its own", () => {
+    // Twice the text per second is twice the beats: about a second at a calm writing pace, and
+    // two-thirds of that at half again the pace.
+    expect(pulsePeriodMs(22)).toBe(1_000);
+    expect(pulsePeriodMs(33)).toBe(667);
+    expect(pulsePeriodMs(33)).toBeLessThan(pulsePeriodMs(22));
+  });
+
+  it("keeps the beat inside a range a person reads as a pulse", () => {
+    // A model writing faster than the eye follows does not become a blur, and a slow one does not
+    // stop: the two ends hold.
+    expect(pulsePeriodMs(10_000)).toBe(520);
+    expect(pulsePeriodMs(0.01)).toBe(2_400);
+  });
+
+  it("rests at the slow end while nothing is arriving", () => {
+    expect(pulsePeriodMs(0)).toBe(2_400);
+    expect(pulsePeriodMs(-1)).toBe(2_400);
+    expect(pulsePeriodMs(Number.NaN)).toBe(2_400);
   });
 });

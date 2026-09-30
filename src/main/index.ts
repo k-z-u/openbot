@@ -91,6 +91,20 @@ function reportMainProcessFailure(origin: "uncaughtException" | "unhandledReject
 
 const commandLineUserDataDirectory = app.commandLine.getSwitchValue("user-data-dir").trim();
 const developmentProfile = !app.isPackaged ? readDevelopmentProfile(process.env.OPENBOT_DEV_PROFILE) : null;
+/**
+ * Where the packaged app keeps everything it owns: agents, conversations, settings, the encrypted
+ * endpoint keys and the managed provider runtimes.
+ *
+ * It is written out rather than derived from the app's name, because the two are not the same
+ * question. The bundle is KZUBot and the menu bar says so; this directory holds data written under
+ * the name the app used before that, and a path derived from the new name would point at an empty
+ * directory. To the person that reads as an app that forgot every agent they have.
+ *
+ * `providerRuntimeRoot` in `provider-runtime-manager.ts` names the same directory for the packaged
+ * case, so the downloaded CLIs stay where they are too.
+ */
+const USER_DATA_DIRECTORY = "OpenBot";
+
 const developmentRemoteRole =
   !app.isPackaged &&
   (process.env.OPENBOT_DEV_REMOTE_ROLE === "host" || process.env.OPENBOT_DEV_REMOTE_ROLE === "client")
@@ -130,8 +144,11 @@ if (commandLineUserDataDirectory) {
       ),
     ),
   );
+} else {
+  // Pinned, not derived: see `USER_DATA_DIRECTORY`.
+  app.setPath("userData", join(app.getPath("appData"), USER_DATA_DIRECTORY));
 }
-app.setName("OpenBot");
+app.setName("KZUBot");
 app.enableSandbox();
 if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
@@ -503,7 +520,7 @@ function requestDesktopNotificationPermission(
     preference,
     showWelcome: () => {
       if (!Notification.isSupported()) return;
-      showRetainedNotification(new Notification({ title: "OpenBot", body: translate("notification.welcome") }));
+      showRetainedNotification(new Notification({ title: "KZUBot", body: translate("notification.welcome") }));
     },
   });
 }

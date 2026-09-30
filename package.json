@@ -1,6 +1,6 @@
 {
   "name": "openbot",
-  "productName": "OpenBot",
+  "productName": "KZUBot",
   "desktopName": "openbot.desktop",
   "version": "0.25.2",
   "description": "A local-first multi-agent desktop workspace for Codex, Claude, and Grok.",

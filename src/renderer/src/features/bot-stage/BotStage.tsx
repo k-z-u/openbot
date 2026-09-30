@@ -7,7 +7,7 @@ import { useConversationViewScope } from "../conversation/conversation-scope";
 import { AgentStatusLabel } from "./AgentStatusLabel";
 import { BotCore } from "./BotCore";
 import type { AgentVisualInput, AgentVisualState } from "./bot-visual-state";
-import { agentVisualState, wavePlan } from "./bot-visual-state";
+import { agentVisualState, pulsePeriodMs, wavePlan } from "./bot-visual-state";
 import { LatestMessageEcho } from "./LatestMessageEcho";
 import { readTranscriptExpanded, toggleTranscriptExpanded } from "./transcript-preference";
 
@@ -27,18 +27,46 @@ export function BotStage(props: { agent?: AgentProfile | undefined }) {
   const [now, setNow] = createSignal(Date.now());
 
   const activeTurnId = () => conversation.activeTurnId ?? null;
+  const streamingLength = createMemo(() => streamingAnswer(conversation.messages)?.body.length ?? 0);
+  const [charactersPerSecond, setCharactersPerSecond] = createSignal(0);
+  /** The previous reading of the streaming text, for the rate between two ticks. */
+  let sample = { at: 0, length: 0 };
 
   /**
    * The one clock on the stage. It only ticks while a turn or its closing line is on screen, so an
    * idle window wakes up for nothing rather than once a second forever, and it stops with the
    * component.
+   *
+   * The same tick reads how fast the answer is arriving, which is what the heartbeat is paced by.
+   * It is measured from the text itself because that is the only arrival signal the renderer has:
+   * the deltas reach the conversation store already applied, and every provider answers in the same
+   * text. The reading is smoothed over the last few samples, so one burst from a fast model does
+   * not snap the beat to its fastest and a pause between sentences does not stop it dead.
    */
   createEffect(
     () => activeTurnId() !== null || renderedAgentActivity() !== null,
     (running) => {
-      if (!running) return;
+      if (!running) {
+        sample = { at: 0, length: 0 };
+        setCharactersPerSecond(0);
+        return;
+      }
       setNow(Date.now());
-      const timer = window.setInterval(() => setNow(Date.now()), 1_000);
+      const timer = window.setInterval(() => {
+        setNow(Date.now());
+        const at = Date.now();
+        const length = streamingLength();
+        const seconds = (at - sample.at) / 1_000;
+        // The first tick has nothing to compare against; a tick that arrived early would divide by
+        // almost nothing; and a tick that arrived very late is a window the browser throttled while
+        // the window was hidden, where dividing by the whole gap would read a burst of text as a
+        // crawl. Those re-seed instead of measuring.
+        if (sample.at > 0 && seconds >= 0.25 && seconds <= 5) {
+          const growth = Math.max(0, length - sample.length) / seconds;
+          setCharactersPerSecond((previous) => previous * 0.4 + growth * 0.6);
+        }
+        sample = { at, length };
+      }, 1_000);
       return () => window.clearInterval(timer);
     },
   );
@@ -77,6 +105,7 @@ export function BotStage(props: { agent?: AgentProfile | undefined }) {
 
   const state = createMemo<AgentVisualState>(() => agentVisualState(input()));
   const plan = createMemo(() => wavePlan(state(), conversation.agent?.reasoningEffort ?? null));
+  const pulsePeriod = createMemo(() => pulsePeriodMs(charactersPerSecond()));
   const detail = createMemo(() => renderedAgentActivity()?.detail ?? null);
   const since = createMemo(() => (activeTurnId() === null ? null : (renderedAgentActivity()?.since ?? null)));
 
@@ -84,7 +113,8 @@ export function BotStage(props: { agent?: AgentProfile | undefined }) {
     <section
       class="kz-stage"
       data-state={state()}
-      style={`--kz-period: ${plan().periodMs}ms; --kz-amplitude: ${plan().amplitude}`}
+      data-motion={plan().motion}
+      style={`--kz-period: ${plan().periodMs}ms; --kz-amplitude: ${plan().amplitude}; --kz-pulse: ${pulsePeriod()}ms`}
     >
       <p class="kz-stage-mark">{t("kz.brand")}</p>
       <BotCore agent={props.agent} state={state()} plan={plan()} size={WAVE_BOX} />

@@ -52,7 +52,7 @@ export async function exportOpenBotData(
       // hands a reader the wrong shape under a version that promised the old one.
       schemaVersion: 4,
       exportedAt: new Date().toISOString(),
-      application: { name: "OpenBot", version: app.getVersion() },
+      application: { name: "KZUBot", version: app.getVersion() },
       scope: {
         includes: ["agent profiles", "agent memories", "conversation snapshots", "queues", "attachments"],
         excludes: [

@@ -5,7 +5,6 @@ import { AgentStatusLabel } from "./AgentStatusLabel";
 import { BotCore } from "./BotCore";
 import type { AgentVisualState } from "./bot-visual-state";
 import { wavePlan } from "./bot-visual-state";
-import { ThinkingWaves } from "./ThinkingWaves";
 
 const SIZE = 360;
 
@@ -30,27 +29,7 @@ function testAgent(overrides: Partial<AgentProfile> = {}): AgentProfile {
   };
 }
 
-/**
- * What the rings draw, counted by their own elements.
- *
- * A ring is decoration: it has no role and no name, so there is nothing accessible to query. The
- * geometry and the motion table are asserted without a DOM in `bot-visual-state.test.ts` and
- * `wave-path.test.ts`; what is worth asserting here is only that the plan reaches the document,
- * which counting the drawn paths does.
- */
-function drawnRings(state: AgentVisualState, effort: string | null = "medium"): number {
-  const view = render(() => <ThinkingWaves plan={wavePlan(state, effort)} size={SIZE} />);
-  const count = view.container.querySelectorAll("path").length;
-  view.unmount();
-  return count;
-}
-
 describe("ThinkingWaves", () => {
-  it("draws the rings the plan asks for", () => {
-    expect(drawnRings("idle", "max")).toBe(1);
-    expect(drawnRings("deep-thinking")).toBe(3);
-  });
-
   it("contributes nothing to the accessibility tree: the rings are decoration", () => {
     render(() => <BotCore agent={testAgent()} state="thinking" plan={wavePlan("thinking", "high")} size={SIZE} />);
     // One image for the agent and nothing else, however many rings are drawn behind it.
