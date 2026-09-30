@@ -2,6 +2,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentEvent } from "@openbot/contracts/ipc";
+import { isAgentModelOption } from "@openbot/contracts/ipc";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentProcessExitError, type AgentProvider } from "../agent-client";
 import type { AgentService } from "../agent-service";
@@ -2083,6 +2084,58 @@ describe.sequential("ProviderRuntime: custom provider reload", () => {
     // Signed out, OpenCode keeps no client. A save must not read as a failure: the next spawn - the
     // next Connect press - reads the config.
     await expect(running.reloadOpenCodeConfig()).resolves.toBe("not-running");
+  });
+
+  // The endpoint's models arrive through the CLI's catalogue like every other model, and that
+  // catalogue is one payload: `isAgentModelOption` guards it on the way to the renderer, and the IPC
+  // and Team API list decoders drop the whole array when one option fails. OpenCode lists a
+  // third-party provider's `~` aliases and a provider whose entries are names with spaces, so one
+  // such id used to empty the picker - the endpoint's own models included.
+  it("keeps an endpoint's models when the CLI also lists an id the contract refuses", async () => {
+    process.env.OPENBOT_OPENCODE_PATH = await createFakeOpencode(root);
+    const { store, mailbox } = stores(root);
+    const endpoint: CustomProviderConfig = {
+      id: "opencode-go-direct",
+      name: "OpenCode Go",
+      baseUrl: "https://opencode.ai/zen/go/v1",
+      apiKey: "test-key",
+      models: [{ id: "deepseek-v4.1-flash", name: "DeepSeek V4.1 Flash" }],
+      headers: [],
+    };
+    const client = new FakeAgentClient("opencode", "DONE");
+    client.modelList = () => ({
+      data: [
+        { model: "opencode/muse-spark-1.3-contributor-free", displayName: "Muse Spark 1.3 Contributor Free" },
+        { model: "opencode-go-direct/deepseek-v4.1-flash", displayName: "OpenCode Go/DeepSeek V4.1 Flash" },
+        { model: "openrouter/~deepseek/deepseek-flash-latest", displayName: "OpenRouter/~deepseek/DeepSeek Flash" },
+        { model: "omniroute/aihorde/AlbedoBase XL (SDXL)", displayName: "Omniroute/AlbedoBase XL (SDXL)" },
+      ],
+    });
+    service = createTestService({
+      store,
+      mailbox,
+      preferredProvider: "opencode",
+      clientFactory: (provider) => (provider === "opencode" ? client : new FakeAgentClient(provider, "DONE")),
+      bundledExecutables: {},
+      prepareAgentWorkspace: async () => undefined,
+      hostedSites: null,
+      sidebarLayout: null,
+      preferredModel: null,
+      credentials: { apiKey: () => null, customProviders: () => [endpoint], mcpServers: () => [] },
+    });
+    const running = service;
+    await running.initialize();
+
+    const catalog = running.listModels();
+    // The endpoint's model stays an OpenCode one, under the id OpenCode composes for it, and the two
+    // ids the contract refuses are gone rather than the catalog they were listed beside.
+    expect(catalog.filter((model) => model.provider === "opencode").map((model) => model.id)).toEqual([
+      "opencode/muse-spark-1.3-contributor-free",
+      "opencode-go-direct/deepseek-v4.1-flash",
+    ]);
+    // One refused id takes the whole list with it, so every option has to pass the guard the
+    // renderer's own decoder applies.
+    expect(catalog.every((model) => isAgentModelOption(model))).toBe(true);
   });
 });
 

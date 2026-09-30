@@ -14,6 +14,7 @@ import type {
 import {
   accountUsageCoversModel,
   agentProviderDescriptor,
+  isAgentModelOption,
   isAgentProvider,
   isReasoningEffort,
   workspaceAccessEnforced,
@@ -2013,7 +2014,7 @@ export class ProviderRuntime implements ProviderPort {
               if (provider === "opencode" && hasStoredKey && isOpencodeModelUnusableWithStoredKey(server.model, name)) {
                 continue;
               }
-              models.push({
+              const option: AgentModelOption = {
                 provider: client.provider,
                 id: server.model,
                 name,
@@ -2025,7 +2026,15 @@ export class ProviderRuntime implements ProviderPort {
                 supportedReasoningEfforts: efforts.length
                   ? efforts
                   : (fallback?.supportedReasoningEfforts ?? ["medium"]),
-              });
+              };
+              // The same fail-closed list decoders, for the id: a CLI's own catalogue can name a
+              // model outside the id charset - OpenCode lists an alias that starts `~`, and a
+              // provider whose entries are display names puts spaces in them - and one such id does
+              // not lose that model, it empties the picker for every provider, custom endpoints
+              // included. An id the contract refuses is not selectable either, because
+              // `createAgent` and `updateAgent` guard it the same way, so the model is dropped
+              // here instead of taking the catalogue with it.
+              if (isAgentModelOption(option)) models.push(option);
             }
             const rank = PREFERRED_MODEL_ORDER.get(client.provider) ?? (() => 0);
             // Tier first, then newest first. Sort is stable, so the CLI's own order still decides
