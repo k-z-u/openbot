@@ -24,6 +24,7 @@
 @import "@openbot/ui/styles/settings-panel.css";
 @import "@openbot/ui/styles/provider-code-login.css";
 @import "@openbot/ui/features/conversation/conversation.css";
+@import "./features/bot-stage/bot-stage.css";
 @import "@openbot/ui/features/channels/channel-avatar.css";
 @import "./features/channels/channels.css";
 @import "@openbot/ui/features/channels/channel-activity.css";

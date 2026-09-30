@@ -1,6 +1,8 @@
 import { MessageSelectionActions } from "@openbot/ui/features/conversation/SelectionActions";
 import { useText } from "@openbot/ui/text";
 import { createEffect, Show } from "solid-js";
+import { BotStage } from "../bot-stage/BotStage";
+import { readTranscriptExpanded } from "../bot-stage/transcript-preference";
 import { ConversationComposer } from "./ConversationComposer";
 import { ConversationHeader } from "./ConversationHeader";
 import { ConversationPanels } from "./ConversationPanels";
@@ -44,11 +46,13 @@ export function ConversationView(props: ConversationProps) {
         onKeyDown={handleChatSearchShortcut}
         class={[
           "conversation-panel",
+          "kz-panel",
           {
             "conversation-drop-active": dropActive(),
             "browser-panel-active": browserSidebarOpen() || filePreviewOpen() || filesOpen(),
           },
         ]}
+        data-kz-transcript={readTranscriptExpanded() ? "expanded" : "folded"}
         style={`--settings-panel-width: ${settingsPanelWidth()}px; --browser-panel-width: ${browserPanelWidth()}px`}
         onDragEnter={(event) => {
           if (!props.globalOverlayOpen && event.dataTransfer?.types.includes("Files")) setDropActive(true);
@@ -76,6 +80,8 @@ export function ConversationView(props: ConversationProps) {
         </Show>
         <ConversationHeader />
         {props.notice}
+
+        <BotStage agent={props.agent} />
 
         <ConversationTimeline />
 

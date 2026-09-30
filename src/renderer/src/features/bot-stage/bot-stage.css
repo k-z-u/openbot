@@ -1,0 +1,373 @@
+/*
+ * The KZUBot stage: the agent at the centre, its thinking drawn around it, and the transcript
+ * folded under both.
+ *
+ * Everything here is a decoration over the app's palette and nothing declares a colour of its own.
+ * The movement is transform and opacity only, so the rings run on the compositor and an idle window
+ * costs no main-thread frames at all; the outline itself is written once per state change by
+ * `wave-path.ts`, never per frame.
+ *
+ * The three timings are the only numbers the animation needs, and they are read by the keyframes
+ * below through `--kz-period`, which the stage sets from the plan.
+ */
+
+.kz-stage {
+  --kz-halo: clamp(180px, 24vh, 340px);
+  --kz-period: 17s;
+  --kz-amplitude: 0.05;
+
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-4) var(--openbot-space-6) 0;
+  background: var(--openbot-bg-canvas);
+}
+
+/**
+ * The product mark over the agent. It is the one place the build says whose UI this is, and it is
+ * deliberately quiet: the subject of the screen is the agent, not the app.
+ */
+.kz-stage-mark {
+  margin: 0;
+  color: var(--openbot-text-dim);
+  font-size: var(--openbot-text-sm);
+  font-weight: 560;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* The rings and the face sit in one box, so three rings never push the face off centre. */
+.kz-bot-core {
+  position: relative;
+  display: grid;
+  width: var(--kz-halo);
+  height: var(--kz-halo);
+  flex: 0 0 auto;
+  place-items: center;
+}
+
+/*
+ * A still radial wash rather than a blurred SVG: a filter would repaint the whole halo every frame,
+ * and this reads as light coming off the agent without any of that cost.
+ */
+.kz-bot-core-aura {
+  position: absolute;
+  inset: -18%;
+  border-radius: var(--openbot-radius-pill);
+  background: radial-gradient(circle at center, var(--openbot-accent-soft), transparent 62%);
+  opacity: 0.9;
+  transition: opacity var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.kz-bot-core[data-state="error"] .kz-bot-core-aura,
+.kz-bot-core[data-state="waiting"] .kz-bot-core-aura {
+  background: radial-gradient(circle at center, var(--openbot-warning-soft), transparent 62%);
+}
+
+.kz-bot-core[data-state="idle"] .kz-bot-core-aura {
+  opacity: 0.45;
+}
+
+.kz-bot-core-face {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.kz-bot-core-avatar {
+  width: calc(var(--kz-halo) * 0.62);
+  height: calc(var(--kz-halo) * 0.62);
+}
+
+/* --- waves ---------------------------------------------------------------------------------- */
+
+.kz-waves {
+  position: absolute;
+  inset: 0;
+}
+
+.kz-wave {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  animation: kz-wave-drift var(--kz-period) linear infinite;
+  /* One layer's worth of phase per index, so three rings drift out of step with no extra rules. */
+  animation-delay: calc(var(--kz-period) / -6 * var(--kz-layer));
+}
+
+.kz-wave-line {
+  fill: none;
+  stroke: var(--openbot-accent-text);
+  stroke-width: 1.1;
+  stroke-linecap: round;
+  opacity: 0.5;
+  transform-origin: center;
+  animation: kz-wave-breathe calc(var(--kz-period) / 2) var(--openbot-ease-in-out) infinite;
+}
+
+.kz-wave-line[data-layer="1"] {
+  opacity: 0.34;
+}
+
+.kz-wave-line[data-layer="2"] {
+  opacity: 0.22;
+}
+
+.kz-waves[data-motion="still"] .kz-wave-line {
+  animation-name: kz-wave-settle;
+}
+
+.kz-waves[data-motion="bleed"] .kz-wave-line {
+  animation-name: kz-wave-bleed;
+}
+
+.kz-waves[data-motion="converge"] .kz-wave-line {
+  animation-name: kz-wave-converge;
+}
+
+@keyframes kz-wave-drift {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes kz-wave-breathe {
+  0%,
+  100% {
+    transform: scale(calc(1 - var(--kz-amplitude)));
+    opacity: 0.32;
+  }
+
+  50% {
+    transform: scale(calc(1 + var(--kz-amplitude)));
+    opacity: 0.62;
+  }
+}
+
+/* Idle, waiting and error: the outline is there and it is not doing anything. */
+@keyframes kz-wave-settle {
+  0%,
+  100% {
+    transform: scale(calc(1 - var(--kz-amplitude)));
+    opacity: 0.28;
+  }
+
+  50% {
+    transform: scale(calc(1 + var(--kz-amplitude)));
+    opacity: 0.42;
+  }
+}
+
+/* A tool step pushes the ring outwards and lets it fade, which is work leaving the agent. */
+@keyframes kz-wave-bleed {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+
+  100% {
+    transform: scale(calc(1 + var(--kz-amplitude) * 2.4));
+    opacity: 0;
+  }
+}
+
+/* An answer pulls the ring back in, which is what finishing looks like. */
+@keyframes kz-wave-converge {
+  0% {
+    transform: scale(calc(1 + var(--kz-amplitude) * 2));
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(calc(1 - var(--kz-amplitude)));
+    opacity: 0.5;
+  }
+}
+
+/* --- status --------------------------------------------------------------------------------- */
+
+.kz-status {
+  display: flex;
+  max-width: min(560px, 78%);
+  align-items: center;
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
+}
+
+.kz-status-line {
+  display: flex;
+  margin: 0;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  color: var(--openbot-text-readable);
+  font-size: var(--openbot-text-md);
+  font-weight: 500;
+}
+
+.kz-status-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-text-dim);
+  transition: background var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.kz-status-line[data-state="thinking"] .kz-status-dot,
+.kz-status-line[data-state="deep-thinking"] .kz-status-dot,
+.kz-status-line[data-state="tool-use"] .kz-status-dot,
+.kz-status-line[data-state="answering"] .kz-status-dot,
+.kz-status-line[data-state="queued"] .kz-status-dot {
+  background: var(--openbot-accent);
+}
+
+.kz-status-line[data-state="waiting"] .kz-status-dot,
+.kz-status-line[data-state="error"] .kz-status-dot {
+  background: var(--openbot-warning);
+}
+
+.kz-status-line[data-state="completed"] .kz-status-dot {
+  background: var(--openbot-success);
+}
+
+.kz-status-text {
+  color: var(--openbot-text-primary);
+}
+
+.kz-status-elapsed {
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.kz-status-detail {
+  margin: 0;
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- the newest message --------------------------------------------------------------------- */
+
+.kz-echo {
+  display: flex;
+  width: min(560px, 82%);
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--openbot-space-2);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+}
+
+.kz-echo-who {
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.kz-echo-text {
+  overflow: hidden;
+  margin: 0;
+  color: var(--openbot-text-readable);
+  font-size: var(--openbot-text-sm);
+  line-height: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kz-transcript-toggle {
+  border: 0;
+  background: transparent;
+  color: var(--openbot-text-muted);
+  font: inherit;
+  font-size: var(--openbot-text-sm);
+  cursor: pointer;
+  padding: var(--openbot-space-1) var(--openbot-space-2);
+  transition: color var(--openbot-duration-hover) var(--openbot-ease-out);
+}
+
+.kz-transcript-toggle:hover {
+  color: var(--openbot-text-primary);
+}
+
+/* --- the panel the stage lives in ------------------------------------------------------------ */
+
+/*
+ * Folding: the stage keeps the room and the transcript is a band under it. Expanding gives the room
+ * to the transcript and leaves the stage as a header, which is the state a long conversation is
+ * read in. Both are one attribute on the panel, so the timeline and the composer need no changes.
+ */
+.kz-panel {
+  --kz-stage-room: min(48%, 430px);
+  --kz-transcript-room: min(38%, 340px);
+}
+
+.kz-panel .kz-stage {
+  max-height: var(--kz-stage-room);
+}
+
+/*
+ * The transcript is a band, not the screen. The hairline and the fade are what say so without
+ * taking room from the stage: the first message fades in under the edge rather than stopping at it.
+ */
+.kz-panel .conversation-scroll {
+  max-height: var(--kz-transcript-room);
+  min-height: 84px;
+  flex: 0 1 auto;
+  border-top: 1px solid var(--openbot-border);
+  mask-image: linear-gradient(180deg, transparent 0, var(--openbot-text-primary) 26px);
+}
+
+.kz-panel[data-kz-transcript="expanded"] {
+  --kz-stage-room: clamp(200px, 30%, 300px);
+}
+
+.kz-panel[data-kz-transcript="expanded"] .conversation-scroll {
+  max-height: none;
+  min-height: 160px;
+  flex: 1 1 auto;
+  mask-image: none;
+}
+
+/* A short window has no room for two subjects: the stage keeps its floor and the transcript its
+   three lines, and the composer stays where it is. */
+@media (max-height: 700px) {
+  .kz-panel {
+    --kz-stage-room: 320px;
+    --kz-transcript-room: 30%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /*
+   * The state is carried by the count of rings, their reach and the colour of the status dot, so
+   * freezing the movement loses nothing: a working agent still shows three wide rings where an idle
+   * one shows a single closed one. The selectors are written to match the specificity of the motion
+   * rules above, which is what lets the freeze win on source order instead of on `!important`.
+   */
+  .kz-stage .kz-waves .kz-wave,
+  .kz-stage .kz-waves .kz-wave-line {
+    animation: none;
+  }
+
+  .kz-stage .kz-waves .kz-wave-line {
+    opacity: 0.42;
+  }
+}
