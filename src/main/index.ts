@@ -148,7 +148,22 @@ if (commandLineUserDataDirectory) {
   // Pinned, not derived: see `USER_DATA_DIRECTORY`.
   app.setPath("userData", join(app.getPath("appData"), USER_DATA_DIRECTORY));
 }
-app.setName("KZUBot");
+
+/**
+ * The process's name, which is *not* the name on the tin.
+ *
+ * The bundle, the menu bar, the Dock and the notifications say KZUBot - that comes from
+ * `productName` in `electron-builder.yml`, and it is what the app is called. This is the name
+ * Electron files its Keychain entry under, and macOS seals the key behind `safeStorage` in an entry
+ * named after it. Every stored secret on this computer - the endpoint API keys, the provider
+ * credentials, the browser cookies, the account session - was sealed with the key filed under
+ * "OpenBot", so renaming this would not rename anything a person sees; it would make all of them
+ * unreadable and sign the user out.
+ *
+ * Nothing user-visible reads it: the application menu is built in `main-window.ts` without an
+ * About item, and every name that reaches a person is written out where it is used.
+ */
+app.setName("OpenBot");
 app.enableSandbox();
 if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
